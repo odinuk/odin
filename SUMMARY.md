@@ -43,3 +43,5 @@ The design recognises that most RevOps workflows are bulk-first. Kernel's AI has
 - **Keyboard shortcut bar** — Visible hint showing m=merge, d=dismiss, s=skip, e=escalate for power users
 - **Escalation workflow** — What happens after escalate? Assign to a team member, add a note, set a due date
 - **Multi-duplicate clusters** — When one account has 5+ matches, show them as a group rather than individual pairs
+- **Brand polish** — Refine colour palette, typography weights, and spacing to align tightly with Kernel's brand guidelines
+- **Motion and animation** — Micro-interactions on merge/dismiss actions, smooth transitions between selected pairs, subtle loading states for bulk operations. Animation that communicates state changes, not decoration
