@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pair Display — Comparison</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root {
+  --stone-50:#FAFAF9;--stone-100:#F5F5F4;--stone-200:#E7E5E4;--stone-300:#D6D3D1;
+  --stone-400:#A8A29E;--stone-500:#78716C;--stone-600:#57534E;--stone-700:#44403C;
+  --stone-800:#292524;--stone-900:#1C1917;--stone-950:#0C0A09;
+  --sage:#2e4a39;--sage-mid:#8fa998;--sage-light:#e7eeea;--sage-bg:#f2f7f4;
+  --font-display:'Outfit',sans-serif;
+  --font-body:'DM Sans',sans-serif;
+  --font-mono:'JetBrains Mono',monospace;
+  --radius:6px;
+}
+html{font-size:14px;-webkit-font-smoothing:antialiased}
+body{font-family:var(--font-body);color:var(--stone-900);background:var(--stone-50);line-height:1.5;padding:40px}
+::selection{background:var(--stone-900);color:white}
+
+h1{font-family:var(--font-display);font-size:22px;font-weight:700;letter-spacing:-0.03em;margin-bottom:8px}
+p.intro{font-size:13px;color:var(--stone-500);margin-bottom:40px}
+
+.section{margin-bottom:48px}
+.section-title{font-family:var(--font-display);font-size:15px;font-weight:600;letter-spacing:-0.02em;margin-bottom:4px;color:var(--stone-900)}
+.section-desc{font-size:12px;color:var(--stone-500);margin-bottom:12px}
+.table-wrap{background:white;border:1px solid var(--stone-200);border-radius:var(--radius);max-width:900px}
+table{width:100%;border-collapse:collapse}
+thead th{height:36px;padding:0 14px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:var(--stone-500);text-align:left;background:var(--stone-50);border-bottom:1px solid var(--stone-200)}
+tbody td{padding:10px 14px;border-bottom:1px solid var(--stone-100);vertical-align:top}
+tbody tr:last-child td{border-bottom:none}
+
+.risk-chip{display:inline-flex;align-items:center;gap:4px;height:22px;font-family:var(--font-mono);font-size:10.5px;font-weight:600;padding:0 8px;border-radius:4px;white-space:nowrap;letter-spacing:0.04em}
+.risk-chip .risk-pct{font-weight:400;opacity:0.55}
+.risk-chip.very-low{background:#F0FDF4;color:#15803D}
+.badge{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:4px;font-family:var(--font-mono);font-size:10.5px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;background:#FEF2F2;color:#DC2626}
+.domain{font-family:var(--font-mono);font-size:11.5px;color:var(--stone-400)}
+.meta{font-size:11.5px;color:var(--stone-400)}
+.rev{font-family:var(--font-mono);font-size:12.5px;font-weight:500;color:var(--stone-700)}
+.rev-sub{font-size:11px;color:var(--stone-400)}
+
+/* ── OPTION 1: Inline arrow (current) ── */
+.o1-names{display:flex;flex-direction:column;gap:2px}
+.o1-primary{font-weight:500;font-size:13px;color:var(--stone-900);display:flex;align-items:center;gap:6px}
+.o1-arrow{color:var(--stone-400);font-size:11px}
+
+/* ── OPTION 2: Stacked ── */
+.o2-names{display:flex;flex-direction:column;gap:2px}
+.o2-a{font-weight:500;font-size:13px;color:var(--stone-900)}
+.o2-b{font-weight:400;font-size:13px;color:var(--stone-500);padding-left:12px;border-left:2px solid var(--stone-200)}
+
+/* ── OPTION 3: Split pill ── */
+.o3-names{display:flex;flex-direction:column;gap:4px}
+.o3-pill{display:inline-flex;align-items:center;border:1px solid var(--stone-200);border-radius:var(--radius);overflow:hidden;font-weight:500;font-size:13px}
+.o3-pill-a,.o3-pill-b{padding:4px 10px;color:var(--stone-900)}
+.o3-pill-div{width:1px;background:var(--stone-200);align-self:stretch}
+
+/* ── OPTION 4: Mini cards ── */
+.o4-names{display:flex;flex-direction:column;gap:4px}
+.o4-cards{display:flex;align-items:center;gap:6px}
+.o4-card{padding:4px 10px;border:1px solid var(--stone-200);border-radius:var(--radius);font-weight:500;font-size:13px;color:var(--stone-900);background:white}
+.o4-arrow{color:var(--stone-300);font-size:10px;flex-shrink:0}
+</style>
+</head>
+<body>
+<h1>Pair Display — Comparison</h1>
+<p class="intro">Same 3 rows, 4 different treatments for showing the duplicate pair relationship.</p>
+
+<!-- OPTION 1 -->
+<div class="section">
+  <div class="section-title">Option 1 — Inline arrow (current)</div>
+  <div class="section-desc">Names sit inline with a small ↔ between them.</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th style="width:130">Risk</th><th style="width:100">Type</th><th>Accounts</th><th style="width:90">Revenue</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="risk-chip very-low">Very Low <span class="risk-pct">3%</span></span></td>
+          <td><span class="badge">EXACT</span></td>
+          <td>
+            <div class="o1-names">
+              <div class="o1-primary">Globex Corporation <span class="o1-arrow">↔</span> Globex Corp</div>
+              <div class="domain">globex.io</div>
+              <div class="meta">Marcus Webb · Priya Sharma · Feb 2026</div>
+            </div>
+          </td>
+          <td><div class="rev">$320K</div><div class="rev-sub">3 opps</div></td>
+        </tr>
+        <tr>
+          <td><span class="risk-chip very-low">Very Low <span class="risk-pct">6%</span></span></td>
+          <td><span class="badge">EXACT</span></td>
+          <td>
+            <div class="o1-names">
+              <div class="o1-primary">Acme Technologies Inc. <span class="o1-arrow">↔</span> Acme Technologies</div>
+              <div class="domain">acmetech.com</div>
+              <div class="meta">Sarah Kim · James Chen · Jan 2026</div>
+            </div>
+          </td>
+          <td><div class="rev">$225K</div><div class="rev-sub">3 opps</div></td>
+        </tr>
+        <tr>
+          <td><span class="risk-chip very-low">Very Low <span class="risk-pct">9%</span></span></td>
+          <td><span class="badge">EXACT</span></td>
+          <td>
+            <div class="o1-names">
+              <div class="o1-primary">Initech Systems <span class="o1-arrow">↔</span> Initech Systems LLC</div>
+              <div class="domain">initech.com</div>
+              <div class="meta">David Park · Lisa Huang · Jan 2026</div>
+            </div>
+          </td>
+          <td><div class="rev">$179K</div><div class="rev-sub">3 opps</div></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- OPTION 2 -->
+<div class="section">
+  <div class="section-title">Option 2 — Stacked with indent</div>
+  <div class="section-desc">Record A on top, Record B below with a left border indent to show hierarchy.</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th style="width:130">Risk</th><th style="width:100">Type</th><th>Accounts</th><th style="width:90">Revenue</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="risk-chip very-low">Very Low <span class="risk-pct">3%</span></span></td>
+          <td><span class="badge">EXACT</span></td>
+          <td>
+            <div class="o2-names">
+              <div class="o2-a">Globex Corporation</div>
+              <div class="o2-b">Globex Corp</div>
+              <div class="domain">globex.io</div>
+              <div class="meta">Marcus Webb · Priya Sharma · Feb 2026</div>
+            </div>
+          </td>
+          <td><div class="rev">$320K</div><div class="rev-sub">3 opps</div></td>
+        </tr>
+        <tr>
+          <td><span class="risk-chip very-low">Very Low <span class="risk-pct">6%</span></span></td>
+          <td><span class="badge">EXACT</span></td>
+          <td>
+            <div class="o2-names">
+              <div class="o2-a">Acme Technologies Inc.</div>
+              <div class="o2-b">Acme Technologies</div>
+              <div class="domain">acmetech.com</div>
+              <div class="meta">Sarah Kim · James Chen · Jan 2026</div>
+            </div>
+          </td>
+          <td><div class="rev">$225K</div><div class="rev-sub">3 opps</div></td>
+        </tr>
+        <tr>
+          <td><span class="risk-chip very-low">Very Low <span class="risk-pct">9%</span></span></td>
+          <td><span class="badge">EXACT</span></td>
+          <td>
+            <div class="o2-names">
+              <div class="o2-a">Initech Systems</div>
+              <div class="o2-b">Initech Systems LLC</div>
+              <div class="domain">initech.com</div>
+              <div class="meta">David Park · Lisa Huang · Jan 2026</div>
+            </div>
+          </td>
+          <td><div class="rev">$179K</div><div class="rev-sub">3 opps</div></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- OPTION 3 -->
+<div class="section">
+  <div class="section-title">Option 3 — Split pill</div>
+  <div class="section-desc">Both names inside one container with a divider. The container communicates "these are a pair".</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th style="width:130">Risk</th><th style="width:100">Type</th><th>Accounts</th><th style="width:90">Revenue</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="risk-chip very-low">Very Low <span class="risk-pct">3%</span></span></td>
+          <td><span class="badge">EXACT</span></td>
+          <td>
+            <div class="o3-names">
+              <div class="o3-pill"><span class="o3-pill-a">Globex Corporation</span><span class="o3-pill-div"></span><span class="o3-pill-b">Globex Corp</span></div>
+              <div class="domain">globex.io</div>
+              <div class="meta">Marcus Webb · Priya Sharma · Feb 2026</div>
+            </div>
+          </td>
+          <td><div class="rev">$320K</div><div class="rev-sub">3 opps</div></td>
+        </tr>
+        <tr>
+          <td><span class="risk-chip very-low">Very Low <span class="risk-pct">6%</span></span></td>
+          <td><span class="badge">EXACT</span></td>
+          <td>
+            <div class="o3-names">
+              <div class="o3-pill"><span class="o3-pill-a">Acme Technologies Inc.</span><span class="o3-pill-div"></span><span class="o3-pill-b">Acme Technologies</span></div>
+              <div class="domain">acmetech.com</div>
+              <div class="meta">Sarah Kim · James Chen · Jan 2026</div>
+            </div>
+          </td>
+          <td><div class="rev">$225K</div><div class="rev-sub">3 opps</div></td>
+        </tr>
+        <tr>
+          <td><span class="risk-chip very-low">Very Low <span class="risk-pct">9%</span></span></td>
+          <td><span class="badge">EXACT</span></td>
+          <td>
+            <div class="o3-names">
+              <div class="o3-pill"><span class="o3-pill-a">Initech Systems</span><span class="o3-pill-div"></span><span class="o3-pill-b">Initech Systems LLC</span></div>
+              <div class="domain">initech.com</div>
+              <div class="meta">David Park · Lisa Huang · Jan 2026</div>
+            </div>
+          </td>
+          <td><div class="rev">$179K</div><div class="rev-sub">3 opps</div></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- OPTION 4 -->
+<div class="section">
+  <div class="section-title">Option 4 — Mini cards</div>
+  <div class="section-desc">Each name in its own bordered box, sitting side by side with a small arrow between.</div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th style="width:130">Risk</th><th style="width:100">Type</th><th>Accounts</th><th style="width:90">Revenue</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="risk-chip very-low">Very Low <span class="risk-pct">3%</span></span></td>
+          <td><span class="badge">EXACT</span></td>
+          <td>
+            <div class="o4-names">
+              <div class="o4-cards"><span class="o4-card">Globex Corporation</span><span class="o4-arrow">↔</span><span class="o4-card">Globex Corp</span></div>
+              <div class="domain">globex.io</div>
+              <div class="meta">Marcus Webb · Priya Sharma · Feb 2026</div>
+            </div>
+          </td>
+          <td><div class="rev">$320K</div><div class="rev-sub">3 opps</div></td>
+        </tr>
+        <tr>
+          <td><span class="risk-chip very-low">Very Low <span class="risk-pct">6%</span></span></td>
+          <td><span class="badge">EXACT</span></td>
+          <td>
+            <div class="o4-names">
+              <div class="o4-cards"><span class="o4-card">Acme Technologies Inc.</span><span class="o4-arrow">↔</span><span class="o4-card">Acme Technologies</span></div>
+              <div class="domain">acmetech.com</div>
+              <div class="meta">Sarah Kim · James Chen · Jan 2026</div>
+            </div>
+          </td>
+          <td><div class="rev">$225K</div><div class="rev-sub">3 opps</div></td>
+        </tr>
+        <tr>
+          <td><span class="risk-chip very-low">Very Low <span class="risk-pct">9%</span></span></td>
+          <td><span class="badge">EXACT</span></td>
+          <td>
+            <div class="o4-names">
+              <div class="o4-cards"><span class="o4-card">Initech Systems</span><span class="o4-arrow">↔</span><span class="o4-card">Initech Systems LLC</span></div>
+              <div class="domain">initech.com</div>
+              <div class="meta">David Park · Lisa Huang · Jan 2026</div>
+            </div>
+          </td>
+          <td><div class="rev">$179K</div><div class="rev-sub">3 opps</div></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+</body>
+</html>

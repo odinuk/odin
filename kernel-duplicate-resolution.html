@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kernel — Duplicate Resolution</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root {
+  --stone-50:#FAFAF9;--stone-100:#F5F5F4;--stone-200:#E7E5E4;--stone-300:#D6D3D1;
+  --stone-400:#A8A29E;--stone-500:#78716C;--stone-600:#57534E;--stone-700:#44403C;
+  --stone-800:#292524;--stone-900:#1C1917;--stone-950:#0C0A09;
+  --exact:#DC2626;--exact-bg:#FEF2F2;--exact-border:#FECACA;
+  --regional:#1D4ED8;--regional-bg:#EFF6FF;--regional-border:#BFDBFE;
+  --tenant:#7C3AED;--tenant-bg:#F5F3FF;--tenant-border:#DDD6FE;
+  --location:#B45309;--location-bg:#FFFBEB;--location-border:#FDE68A;
+  --green:#16A34A;--green-bg:#F0FDF4;--green-border:#BBF7D0;
+  --sage:#94A899;--sage-dark:#5c7363;--sage-light:#d4ddd7;--sage-bg:#f0f4f1;
+  --font-display:'Outfit',sans-serif;
+  --font-body:'DM Sans',sans-serif;
+  --font-mono:'JetBrains Mono',monospace;
+  --radius:6px;--radius-lg:10px;
+}
+html{font-size:14px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+body{font-family:var(--font-body);color:var(--stone-900);background:var(--stone-50);line-height:1.5;overflow:hidden;height:100vh}
+button{font-family:inherit;cursor:pointer;border:none;background:none;font-size:inherit}
+input{font-family:inherit;font-size:inherit}
+::selection{background:var(--stone-900);color:white}
+
+/* NAV */
+.sidebar{width:56px;background:transparent;display:flex;flex-direction:column;align-items:center;padding:16px 0;gap:4px;flex-shrink:0}
+.sidebar-icon{width:36px;height:36px;border-radius:var(--radius);display:flex;align-items:center;justify-content:center;color:var(--stone-500);cursor:pointer;transition:all .1s}
+.sidebar-icon:hover{background:rgba(0,0,0,0.06);color:var(--stone-700)}
+.sidebar-icon.active{background:white;color:var(--stone-900);box-shadow:0 1px 3px rgba(0,0,0,0.08)}
+.sidebar-spacer{flex:1}
+.sidebar-avatar{width:30px;height:30px;border-radius:50%;background:var(--stone-200);display:flex;align-items:center;justify-content:center;color:var(--stone-500);font-size:11px;font-weight:600;cursor:pointer}
+.nav{height:48px;background:white;display:flex;align-items:center;justify-content:space-between;padding:0 24px;flex-shrink:0}
+.nav-brand{display:flex;align-items:center;gap:8px}
+
+/* LAYOUT */
+.app{display:flex;height:100vh;background:var(--stone-200)}
+.app-main{display:flex;flex-direction:column;flex:1;overflow:hidden;margin:56px 10px 10px 0;background:white;border-radius:14px;box-shadow:0 1px 4px rgba(0,0,0,0.06)}
+.top-bar{padding:20px 24px 16px;background:white;flex-shrink:0;border-radius:14px 14px 0 0}
+.page-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
+.page-title{font-family:var(--font-display);font-size:20px;font-weight:700;letter-spacing:-0.03em;color:var(--stone-900)}
+.page-subtitle{font-size:13px;color:var(--stone-500);margin-top:2px;display:flex;align-items:center;gap:6px}
+.source-badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:500;color:var(--stone-500);background:var(--stone-100);padding:2px 9px 2px 6px;border-radius:4px;border:1px solid var(--stone-200)}
+.progress-block{text-align:right}
+.progress-bar-track{width:180px;height:5px;background:var(--stone-200);border-radius:3px;overflow:hidden}
+.progress-bar-fill{height:100%;background:var(--sage);border-radius:3px;transition:width .6s cubic-bezier(.16,1,.3,1)}
+.progress-count{font-family:var(--font-mono);font-size:11px;color:var(--stone-600);margin-top:4px}
+
+.toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-left:4px}
+.bulk-actions{display:flex;align-items:center;gap:6px;overflow:hidden;max-width:0;opacity:0;transition:all .25s cubic-bezier(.16,1,.3,1)}
+.bulk-actions.visible{max-width:300px;opacity:1}
+.search-input{height:32px;width:200px;padding:0 10px 0 30px;border:1px solid var(--stone-200);border-radius:var(--radius);font-size:12px;background:white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%2378716C' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E") no-repeat 9px center;transition:border-color .15s}
+.search-input::placeholder{color:var(--stone-400)}
+.search-input:focus{outline:none;border-color:var(--stone-400)}
+.filter-pills{display:flex;gap:3px}
+.pill{height:28px;padding:0 10px;border-radius:4px;font-family:var(--font-mono);font-size:10.5px;font-weight:500;border:1px solid var(--stone-200);background:white;color:var(--stone-600);transition:all .15s;display:flex;align-items:center;gap:4px}
+.pill:hover{border-color:var(--stone-300);background:var(--stone-50)}
+.pill.active{background:var(--sage-dark);color:white;border-color:var(--sage-dark)}
+.pill .count{font-family:var(--font-mono);font-size:10px;opacity:0.6}
+.sort-select{height:28px;padding:0 24px 0 8px;border:1px solid var(--stone-200);border-radius:var(--radius);font-size:11px;font-weight:500;color:var(--stone-600);background:white;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2378716C' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center;cursor:pointer}
+.risk-dropdown{position:relative}
+.risk-dropdown-btn{height:28px;padding:0 24px 0 8px;border:1px solid var(--stone-200);border-radius:var(--radius);font-size:11px;font-weight:500;color:var(--stone-600);background:white url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2378716C' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 6px center;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.risk-dropdown-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.risk-dropdown-dot.very-low{background:#16A34A}
+.risk-dropdown-dot.low{background:#1D4ED8}
+.risk-dropdown-dot.medium{background:#A16207}
+.risk-dropdown-dot.high{background:#DC2626}
+.risk-dropdown-menu{position:absolute;top:100%;left:0;margin-top:4px;background:white;border:1px solid var(--stone-200);border-radius:var(--radius);box-shadow:0 4px 12px rgba(0,0,0,0.08);z-index:50;min-width:160px;padding:4px;display:none}
+.risk-dropdown-menu.open{display:block}
+.risk-dropdown-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:4px;font-size:11px;font-weight:500;color:var(--stone-700);cursor:pointer;transition:background .1s}
+.risk-dropdown-item:hover{background:var(--stone-50)}
+.risk-dropdown-item.active{background:var(--stone-100)}
+.toolbar-right{margin-left:auto;display:flex;gap:6px;align-items:center}
+.bulk-btn{height:28px;padding:0 12px;border-radius:var(--radius);font-size:11px;font-weight:600;background:var(--sage-dark);color:white;transition:opacity .15s}
+.bulk-btn:hover{opacity:0.85}
+.bulk-btn.secondary{background:white;color:var(--stone-700);border:1px solid var(--stone-200)}
+.bulk-count{font-size:11px;color:var(--stone-500);font-weight:500}
+
+.stats-bar{display:flex;align-items:center;gap:6px;margin-bottom:12px;font-family:var(--font-mono);font-size:11.5px;color:var(--stone-500);flex-wrap:wrap}
+.stats-bar-divider{width:1px;height:14px;background:var(--stone-200);margin:0 4px}
+.stats-bar-label{font-weight:600;color:var(--stone-600)}
+.stats-bar-value{font-weight:500}
+.stat-mini{font-family:var(--font-mono);font-size:10px;font-weight:600;padding:2px 6px;border-radius:3px}
+.stat-mini.very-low{background:#F0FDF4;color:#15803D}
+.stat-mini.low{background:#EFF6FF;color:#1D4ED8}
+.stat-mini.medium{background:#FEFCE8;color:#A16207}
+.stat-mini.high{background:#FEF2F2;color:#DC2626}
+
+.progress-card{margin-left:auto;display:flex;align-items:center;gap:10px;background:var(--sage-bg);border:1px solid var(--sage-light);border-radius:var(--radius);padding:6px 12px}
+.progress-card-top{display:flex;align-items:center;gap:6px}
+.progress-card-label{font-size:11px;font-weight:500;color:var(--sage)}
+.progress-card-count{font-family:var(--font-mono);font-size:12px;font-weight:600;color:var(--sage)}
+.progress-card .progress-bar-track{width:100px;height:4px}
+.progress-card .progress-bar-fill{background:var(--sage)}
+.progress-card-pct{font-size:10px;color:var(--sage);font-weight:500;white-space:nowrap}
+
+/* SPLIT PANE */
+.split{display:flex;flex:1;overflow:hidden}
+.list-pane{width:40%;min-width:360px;border-right:1px solid var(--stone-100);display:flex;flex-direction:column;background:white}
+.list-header{display:flex;align-items:center;gap:8px;padding:8px 32px;background:var(--stone-50);flex-shrink:0;font-size:11px;font-weight:600;color:var(--stone-500);text-transform:uppercase;letter-spacing:0.05em}
+.list-header .checkbox{cursor:pointer}
+.list-scroll{flex:1;overflow-y:auto}
+.list-footer{padding:10px 32px;font-size:11px;color:var(--stone-500);font-family:var(--font-mono);display:flex;justify-content:space-between;align-items:center;background:white;flex-shrink:0;border-top:1px solid var(--stone-100)}
+.list-footer select{height:26px;padding:0 20px 0 6px;border:1px solid var(--stone-200);border-radius:var(--radius);font-size:10px;font-weight:500;color:var(--stone-600);background:white;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2378716C' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 4px center;cursor:pointer}
+.page-controls{display:flex;gap:2px;align-items:center}
+.page-btn{min-width:26px;height:24px;padding:0 4px;border-radius:4px;border:1px solid transparent;background:transparent;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:11px;color:var(--stone-600);font-weight:500;transition:all .1s}
+.page-btn:hover:not(:disabled):not(.active){background:var(--stone-50);border-color:var(--stone-200)}
+.page-btn.active{background:var(--sage);color:white;border-color:var(--sage)}
+.page-btn:disabled{opacity:0.3;cursor:default}
+.page-btn.nav-btn{color:var(--stone-500);font-size:14px;font-family:var(--font-body)}
+
+/* LIST ITEMS */
+.list-item{padding:12px 16px;margin:2px 12px;border-radius:var(--radius-lg);cursor:pointer;transition:background .1s;display:flex;gap:10px;align-items:flex-start}
+.list-item:hover{background:var(--stone-50)}
+.list-item:hover .checkbox{border-color:var(--stone-500)}
+.list-item:hover .list-item-name{font-weight:600}
+.list-item.selected{background:var(--stone-100)}
+.list-item.resolved .list-item-name{text-decoration:line-through;text-decoration-color:var(--stone-300)}
+.resolved-badge{font-family:var(--font-mono);font-size:9px;font-weight:600;color:var(--sage-dark);background:var(--sage-bg);padding:2px 6px;border-radius:3px;letter-spacing:0.04em;text-transform:uppercase}
+.list-item-check{padding-top:2px;flex-shrink:0}
+.list-item-body{flex:1;min-width:0;display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.list-item-info{flex:1;min-width:0}
+.list-item-top{display:flex;flex-direction:column;gap:2px;margin-bottom:2px}
+.list-item-name{font-weight:500;font-size:13px;color:var(--stone-900);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list-item-dup-row{display:flex;align-items:center;gap:4px}
+.list-item-dup-row svg{flex-shrink:0}
+.list-item-dup{font-weight:400;font-size:13px;color:var(--stone-700);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list-item-chips{display:flex;gap:4px;flex-shrink:0;align-items:center}
+.list-item-meta{font-size:11px;color:var(--stone-400);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.checkbox{width:15px;height:15px;border:1.5px solid var(--stone-300);border-radius:3px;display:flex;align-items:center;justify-content:center;transition:all .1s;flex-shrink:0}
+.checkbox.checked{background:var(--sage-dark);border-color:var(--sage-dark)}
+.checkbox.checked::after{content:'';width:7px;height:4px;border-left:1.5px solid white;border-bottom:1.5px solid white;transform:rotate(-45deg) translateY(-1px)}
+
+.risk-chip{display:inline-flex;align-items:center;gap:4px;height:20px;font-family:var(--font-mono);font-size:10px;font-weight:400;padding:0 7px;border-radius:4px;white-space:nowrap;letter-spacing:0.04em}
+.risk-chip .risk-pct{opacity:0.55}
+.risk-chip.very-low{background:#F0FDF4;color:#15803D;border:1px solid #BBF7D0}
+.risk-chip.low{background:#EFF6FF;color:#1D4ED8;border:1px solid #BFDBFE}
+.risk-chip.medium{background:#FEFCE8;color:#A16207;border:1px solid #FDE68A}
+.risk-chip.high{background:#FEF2F2;color:#DC2626;border:1px solid #FECACA}
+
+.badge{display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:4px;font-family:var(--font-mono);font-size:10px;font-weight:400;letter-spacing:0.04em;text-transform:uppercase;background:white;color:var(--stone-600);border:1px solid var(--stone-200)}
+
+/* DETAIL PANE */
+.detail-pane{flex:1;overflow-y:auto;background:white;display:flex;flex-direction:column}
+.detail-empty{flex:1;display:flex;align-items:center;justify-content:center;color:var(--stone-400);font-size:14px}
+.detail-header{padding:20px 28px 16px;background:white;flex-shrink:0}
+.detail-title{font-family:var(--font-display);font-size:16px;font-weight:600;letter-spacing:-0.02em;margin-bottom:4px}
+.detail-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+
+.detail-body{flex:1;overflow-y:auto;padding:16px 28px 28px}
+
+/* RECORD CARDS */
+.record-cards-wrap{position:relative;border:1px solid var(--stone-200);border-radius:var(--radius-lg);overflow:hidden}
+.record-cards{display:flex;align-items:stretch}
+.record-card{flex:1;padding:16px 18px;position:relative;background:white}
+.record-card.primary{background:var(--stone-50)}
+.record-cards-divider{width:1px;background:var(--stone-200);position:relative;flex-shrink:0}
+.record-cards-connector{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:16px;height:44px;background:white;border:1px solid var(--stone-200);border-radius:8px;z-index:2}
+.record-card-header{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.record-card-name{font-family:var(--font-display);font-size:14px;font-weight:600;letter-spacing:-0.02em}
+.primary-badge{font-size:9px;background:var(--sage-bg);color:var(--sage);padding:2px 6px;border-radius:3px;font-weight:600;border:1px solid var(--sage-light);text-transform:uppercase;letter-spacing:0.04em;font-family:var(--font-mono)}
+.record-card-fields{display:flex;flex-direction:column;gap:0}
+.record-field{display:flex;justify-content:space-between;padding:6px 0;font-size:12px}
+.record-field-label{color:var(--stone-500);font-weight:500;font-size:11.5px}
+.record-field-value{color:var(--stone-800);font-weight:500;text-align:right;font-family:var(--font-mono);font-size:11.5px}
+
+/* AI CARD */
+.ai-card{border-radius:var(--radius);padding:12px 14px;margin-bottom:12px}
+.ai-card.very-low{background:#F0FDF4;border:1px solid #BBF7D0}
+.ai-card.low{background:#EFF6FF;border:1px solid #BFDBFE}
+.ai-card.medium{background:#FEFCE8;border:1px solid #FDE68A}
+.ai-card.high{background:#FEF2F2;border:1px solid #FECACA}
+.ai-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px;font-family:var(--font-mono)}
+.ai-card.very-low .ai-label{color:#15803D}
+.ai-card.low .ai-label{color:#1D4ED8}
+.ai-card.medium .ai-label{color:#A16207}
+.ai-card.high .ai-label{color:#DC2626}
+.ai-rec{font-size:13px;font-weight:600;color:var(--stone-900)}
+.ai-reasoning{font-size:12px;color:var(--stone-500);margin-top:3px;line-height:1.5}
+
+/* ACTIONS */
+.detail-actions{display:flex;gap:8px;justify-content:space-between;align-items:center;margin-top:16px}
+.detail-actions-left{display:flex;gap:8px}
+.btn{height:36px;padding:0 16px;border-radius:var(--radius);font-size:13px;font-weight:600;transition:all .15s;display:flex;align-items:center;gap:6px}
+.btn-primary{background:var(--sage-dark);color:white}
+.btn-primary:hover{background:#4a6351}
+.btn-secondary{background:white;color:var(--stone-700);border:1px solid var(--stone-200)}
+.btn-secondary:hover{background:var(--stone-50)}
+.btn-ghost{color:var(--stone-500);padding:0 12px}
+.btn-ghost:hover{color:var(--stone-800);background:var(--stone-50)}
+.btn-danger{color:var(--exact)}
+.btn-danger:hover{background:var(--exact-bg)}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--stone-900);color:white;padding:10px 20px;border-radius:var(--radius-lg);font-size:13px;font-weight:500;z-index:300;transition:transform .3s cubic-bezier(.16,1,.3,1);display:flex;align-items:center;gap:8px;box-shadow:0 8px 30px rgba(0,0,0,0.2)}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast .toast-icon{color:var(--sage)}
+
+/* SCROLLBAR */
+.list-scroll::-webkit-scrollbar{width:0}
+.detail-body::-webkit-scrollbar{width:5px}
+.list-scroll::-webkit-scrollbar-track,.detail-body::-webkit-scrollbar-track{background:transparent}
+.list-scroll::-webkit-scrollbar-thumb,.detail-body::-webkit-scrollbar-thumb{background:var(--stone-300);border-radius:3px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useMemo, useCallback, useEffect, useRef } = React;
+
+function mulberry32(seed){
+  return function(){
+    let t = seed += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function generateAllPairs(){
+  const rand = mulberry32(42);
+  const pick = arr => arr[Math.floor(rand() * arr.length)];
+  const randInt = (min,max) => Math.floor(min + rand()*(max-min+1));
+
+  const names = [
+    'Nexus','Pinnacle','Vertex','Meridian','Atlas','Helios','Quantum','Prism','Zenith','Nova',
+    'Eclipse','Orion','Falcon','Crestwave','Sapphire','Ironclad','Brightpath','Cobalt','Evergreen','Polaris',
+    'Summit','Vanguard','Redwood','Silverline','Catalyst','Forge','Keystone','Radiant','Spectrum','Trident',
+    'Aurora','Granite','Harbor','Jade','Kinetic','Lumen','Mosaic','Neptune','Obsidian','Pacific',
+    'Quartz','Rift','Stellar','Tundra','Unity','Vector','Waveform','Xenon','Zephyr','Axiom',
+    'Beacon','Cipher','Dynamo','Echo','Ember','Flux','Grid','Helix','Impulse','Jetstream',
+    'Krypton','Lattice','Magnet','Nimbus','Omega','Parallel','Resonance','Sigma','Titan','Uplift',
+    'Vivid','Wavelength','Apex','Bolt','Circuit','Drift','Aether','Basalt','Cortex','Delphi',
+  ];
+  const suffixes = ['Technologies','Systems','Digital','Solutions','Analytics','Software','Group','Corp',
+    'Dynamics','Labs','Industries','Innovations','Computing','Networks','Consulting','Partners','Ventures','Health','Energy','Robotics'];
+  const industries = ['Software','Technology','Financial Services','Healthcare','Manufacturing','Retail','Energy',
+    'Consulting','Telecommunications','Education','Real Estate','Logistics','Biotechnology','Cybersecurity',
+    'Data Analytics','Cloud Computing','AI & ML','FinTech','EdTech','CleanTech','Legal Tech','InsurTech'];
+  const owners = ['Sarah Kim','James Chen','Marcus Webb','Priya Sharma','David Park','Lisa Huang','Emma Clarke',
+    'Hans Mueller','Carlos Rivera','Yuki Tanaka','Alex Thompson','Maya Patel','Robert Wilson','Sofia Rodriguez',
+    'Daniel Lee','Rachel Green','Michael Brown','Aisha Khan','Tom Anderson','Nina Costa'];
+  const cities = [
+    {full:'San Francisco, CA',short:'SF, CA'},{full:'New York, NY',short:'NY, NY'},
+    {full:'Austin, TX',short:'Austin, TX'},{full:'Seattle, WA',short:'Seattle, WA'},
+    {full:'Boston, MA',short:'Boston, MA'},{full:'Chicago, IL',short:'Chicago, IL'},
+    {full:'Los Angeles, CA',short:'LA, CA'},{full:'Denver, CO',short:'Denver, CO'},
+    {full:'Atlanta, GA',short:'Atlanta, GA'},{full:'Portland, OR',short:'Portland, OR'},
+    {full:'Miami, FL',short:'Miami, FL'},{full:'Dallas, TX',short:'Dallas, TX'},
+    {full:'Phoenix, AZ',short:'Phoenix, AZ'},{full:'Philadelphia, PA',short:'Philly, PA'},
+  ];
+  const streets = ['Market St','Broadway','Main St','Park Ave','Commercial Dr','Tech Blvd',
+    'Innovation Way','Enterprise Rd','First Ave','Oak St','Elm St','Pine St','Cedar Ln','Maple Dr'];
+  const regions = ['Europe','UK Ltd','EMEA','GmbH','APAC','Japan KK','Australia','Canada','LATAM','Nordic','Middle East'];
+  const divisions = ['Financial Services','Healthcare','Media','Consulting','Analytics','Cloud','Security',
+    'Education','Insurance','Logistics','Payments','Biotech'];
+  const locSuffixes = ['West','East','North','South','Downtown','HQ2','Campus B','Bay Area','Midtown'];
+  const months = ['Jan 2026','Feb 2026','Dec 2025','Nov 2025','Oct 2025','Sep 2025','Aug 2025','Jul 2025','Jun 2025','Mar 2025'];
+  const tlds = ['.com','.io','.co','.net','.tech','.dev'];
+
+  const seeds = [
+    {id:1,confidence:94,classification:'EXACT',status:'pending',recommendation:'merge',master:'B',
+      a:{name:'Acme Technologies Inc.',domain:'acmetech.com',address:'100 Market St, SF, CA 94105',industry:'Software',employees:450,owner:'Sarah Kim',opps:2,oppValue:140000,lastActivity:'Jan 2026'},
+      b:{name:'Acme Technologies',domain:'acmetech.com',address:'100 Market Street, San Francisco',industry:'Technology',employees:520,owner:'James Chen',opps:1,oppValue:85000,lastActivity:'Nov 2025'},
+      signals:['domain','address','name']},
+    {id:2,confidence:97,classification:'EXACT',status:'pending',recommendation:'merge',master:'A',
+      a:{name:'Globex Corporation',domain:'globex.io',address:'200 Pine St, New York, NY 10005',industry:'Financial Services',employees:1200,owner:'Marcus Webb',opps:3,oppValue:320000,lastActivity:'Feb 2026'},
+      b:{name:'Globex Corp',domain:'globex.io',address:'200 Pine Street, New York',industry:'Financial Services',employees:1180,owner:'Priya Sharma',opps:0,oppValue:0,lastActivity:'Sep 2025'},
+      signals:['domain','address','name','industry']},
+    {id:3,confidence:91,classification:'EXACT',status:'pending',recommendation:'merge',master:'A',
+      a:{name:'Initech Systems',domain:'initech.com',address:'500 Congress Ave, Austin, TX 78701',industry:'Enterprise Software',employees:280,owner:'David Park',opps:1,oppValue:67000,lastActivity:'Dec 2025'},
+      b:{name:'Initech Systems LLC',domain:'initech.com',address:'500 Congress Avenue, Austin',industry:'Software',employees:290,owner:'Lisa Huang',opps:2,oppValue:112000,lastActivity:'Jan 2026'},
+      signals:['domain','address','name']},
+    {id:4,confidence:82,classification:'REGIONAL',status:'pending',recommendation:'review',master:null,
+      a:{name:'Stark Industries',domain:'stark.com',address:'10880 Malibu Point, Malibu, CA',industry:'Defense & Aerospace',employees:8500,owner:'Sarah Kim',opps:1,oppValue:500000,lastActivity:'Feb 2026'},
+      b:{name:'Stark Industries Europe',domain:'stark.eu',address:'Königstraße 5, Munich, Germany',industry:'Defense',employees:2200,owner:'Hans Mueller',opps:2,oppValue:180000,lastActivity:'Jan 2026'},
+      signals:['name']},
+    {id:5,confidence:78,classification:'REGIONAL',status:'pending',recommendation:'review',master:null,
+      a:{name:'Wayne Enterprises',domain:'wayneenterprises.com',address:'1007 Mountain Drive, Gotham, NJ',industry:'Conglomerate',employees:12000,owner:'Marcus Webb',opps:4,oppValue:890000,lastActivity:'Feb 2026'},
+      b:{name:'Wayne Enterprises UK Ltd',domain:'wayne.co.uk',address:'1 Canada Square, London E14',industry:'Conglomerate',employees:3400,owner:'Emma Clarke',opps:1,oppValue:210000,lastActivity:'Dec 2025'},
+      signals:['name']},
+    {id:6,confidence:85,classification:'TENANT',status:'pending',recommendation:'review',master:null,
+      a:{name:'LexCorp',domain:'lexcorp.com',address:'1000 LexCorp Plaza, Metropolis, DE',industry:'Technology',employees:6800,owner:'Priya Sharma',opps:2,oppValue:445000,lastActivity:'Jan 2026'},
+      b:{name:'LexCorp Financial Services',domain:'lexcorp-fs.com',address:'100 Wall St, New York, NY',industry:'Financial Services',employees:950,owner:'James Chen',opps:1,oppValue:175000,lastActivity:'Feb 2026'},
+      signals:['name','address_partial']},
+    {id:7,confidence:96,classification:'EXACT',status:'resolved',recommendation:'merge',master:'A',
+      a:{name:'Hooli Inc',domain:'hooli.xyz',address:'5230 Newell Rd, Palo Alto, CA',industry:'Technology',employees:15000,owner:'David Park',opps:5,oppValue:1200000,lastActivity:'Feb 2026'},
+      b:{name:'Hooli',domain:'hooli.xyz',address:'5230 Newell Road, Palo Alto',industry:'Technology',employees:14800,owner:'Sarah Kim',opps:0,oppValue:0,lastActivity:'Jun 2025'},
+      signals:['domain','address','name','industry']},
+    {id:8,confidence:88,classification:'EXACT',status:'pending',recommendation:'merge',master:'B',
+      a:{name:'Pied Piper',domain:'piedpiper.com',address:'5230 Newell Rd, Palo Alto, CA',industry:'Software',employees:12,owner:'Lisa Huang',opps:0,oppValue:0,lastActivity:'Mar 2025'},
+      b:{name:'Pied Piper Technologies',domain:'piedpiper.com',address:'934 San Antonio Rd, Palo Alto',industry:'Data Compression',employees:45,owner:'Lisa Huang',opps:1,oppValue:89000,lastActivity:'Jan 2026'},
+      signals:['domain','name','owner']},
+    {id:9,confidence:71,classification:'REGIONAL',status:'pending',recommendation:'review',master:null,
+      a:{name:'Massive Dynamic',domain:'massivedynamic.com',address:'570 Lexington Ave, New York',industry:'Technology',employees:4500,owner:'Marcus Webb',opps:2,oppValue:340000,lastActivity:'Feb 2026'},
+      b:{name:'Massive Dynamic GmbH',domain:'massivedynamic.de',address:'Friedrichstraße 43, Berlin',industry:'Technologie',employees:890,owner:'Hans Mueller',opps:1,oppValue:95000,lastActivity:'Nov 2025'},
+      signals:['name']},
+    {id:10,confidence:92,classification:'EXACT',status:'pending',recommendation:'merge',master:'A',
+      a:{name:'Cyberdyne Systems',domain:'cyberdyne.net',address:'18144 El Camino Real, Sunnyvale, CA',industry:'Robotics & AI',employees:680,owner:'Priya Sharma',opps:3,oppValue:290000,lastActivity:'Feb 2026'},
+      b:{name:'Cyberdyne',domain:'cyberdyne.net',address:'18144 El Camino, Sunnyvale',industry:'Artificial Intelligence',employees:670,owner:'David Park',opps:0,oppValue:0,lastActivity:'Aug 2025'},
+      signals:['domain','address','name']},
+    {id:11,confidence:89,classification:'EXACT',status:'pending',recommendation:'merge',master:'B',
+      a:{name:'Soylent Corp',domain:'soylentcorp.com',address:'1 Corporate Dr, Trenton, NJ',industry:'Food & Beverage',employees:320,owner:'Emma Clarke',opps:0,oppValue:0,lastActivity:'Jul 2025'},
+      b:{name:'Soylent Corporation',domain:'soylentcorp.com',address:'1 Corporate Drive, Trenton, NJ 08608',industry:'Food Tech',employees:340,owner:'James Chen',opps:2,oppValue:156000,lastActivity:'Jan 2026'},
+      signals:['domain','address','name']},
+    {id:12,confidence:93,classification:'EXACT',status:'resolved',recommendation:'merge',master:'A',
+      a:{name:'Weyland-Yutani',domain:'weyland-yutani.com',address:'100 Universal City Plaza, LA, CA',industry:'Conglomerate',employees:45000,owner:'Sarah Kim',opps:2,oppValue:780000,lastActivity:'Feb 2026'},
+      b:{name:'Weyland Yutani Corp',domain:'weyland-yutani.com',address:'100 Universal City Plaza, Los Angeles',industry:'Conglomerate',employees:44200,owner:'Marcus Webb',opps:1,oppValue:200000,lastActivity:'Oct 2025'},
+      signals:['domain','address','name','industry']},
+    {id:13,confidence:68,classification:'LOCATION',status:'pending',recommendation:'review',master:null,
+      a:{name:'Aperture Science',domain:'aperturescience.com',address:'Upper Michigan, MI',industry:'Research',employees:1500,owner:'David Park',opps:1,oppValue:230000,lastActivity:'Dec 2025'},
+      b:{name:'Aperture Science Labs',domain:'aperturelabs.com',address:'Cleveland, OH',industry:'Research & Development',employees:400,owner:'Lisa Huang',opps:0,oppValue:0,lastActivity:'May 2025'},
+      signals:['name']},
+    {id:14,confidence:77,classification:'TENANT',status:'pending',recommendation:'review',master:null,
+      a:{name:'Dharma Initiative',domain:'dharma.org',address:'4 Hanso Way, Ann Arbor, MI',industry:'Research',employees:200,owner:'Emma Clarke',opps:0,oppValue:0,lastActivity:'Sep 2025'},
+      b:{name:'Dharma Healthcare',domain:'dharmahealth.com',address:'820 Jorie Blvd, Oak Brook, IL',industry:'Healthcare',employees:150,owner:'Priya Sharma',opps:1,oppValue:45000,lastActivity:'Jan 2026'},
+      signals:['name_partial']},
+    {id:15,confidence:70,classification:'LOCATION',status:'pending',recommendation:'review',master:null,
+      a:{name:'Wonka Industries',domain:'wonka.com',address:'1445 Norwood Ave, Cherry Hill, NJ',industry:'Manufacturing',employees:2100,owner:'James Chen',opps:2,oppValue:180000,lastActivity:'Feb 2026'},
+      b:{name:'Wonka Industries West',domain:'wonka.com',address:'800 W Olympic Blvd, Los Angeles, CA',industry:'Manufacturing',employees:680,owner:'Sarah Kim',opps:1,oppValue:90000,lastActivity:'Jan 2026'},
+      signals:['domain','name','industry']},
+    {id:16,confidence:95,classification:'EXACT',status:'pending',recommendation:'merge',master:'A',
+      a:{name:'Tyrell Corporation',domain:'tyrell.com',address:'2019 Commerce Dr, Los Angeles, CA',industry:'Biotechnology',employees:3400,owner:'Marcus Webb',opps:4,oppValue:620000,lastActivity:'Feb 2026'},
+      b:{name:'Tyrell Corp',domain:'tyrell.com',address:'2019 Commerce Drive, LA',industry:'Biotech',employees:3200,owner:'David Park',opps:1,oppValue:85000,lastActivity:'Nov 2025'},
+      signals:['domain','address','name']},
+    {id:17,confidence:73,classification:'REGIONAL',status:'pending',recommendation:'review',master:null,
+      a:{name:'Abstergo Industries',domain:'abstergo.com',address:'2000 Market St, Philadelphia, PA',industry:'Pharmaceutical',employees:5600,owner:'Lisa Huang',opps:2,oppValue:410000,lastActivity:'Jan 2026'},
+      b:{name:'Abstergo EMEA',domain:'abstergo.eu',address:'Via Roma 10, Rome, Italy',industry:'Pharmaceutical',employees:1800,owner:'Hans Mueller',opps:1,oppValue:95000,lastActivity:'Dec 2025'},
+      signals:['name']},
+    {id:18,confidence:65,classification:'LOCATION',status:'dismissed',recommendation:'review',master:null,
+      a:{name:'Black Mesa',domain:'blackmesa.org',address:'Black Mesa, NM 87710',industry:'Research',employees:750,owner:'David Park',opps:1,oppValue:145000,lastActivity:'Nov 2025'},
+      b:{name:'Black Mesa Labs',domain:'blackmesalabs.com',address:'450 Serra Mall, Stanford, CA',industry:'Research',employees:120,owner:'Priya Sharma',opps:0,oppValue:0,lastActivity:'Apr 2025'},
+      signals:['name_partial']},
+    {id:19,confidence:90,classification:'EXACT',status:'pending',recommendation:'merge',master:'B',
+      a:{name:'Oscorp',domain:'oscorp.com',address:'200 Park Ave, New York, NY',industry:'Chemical',employees:1900,owner:'Emma Clarke',opps:0,oppValue:0,lastActivity:'Aug 2025'},
+      b:{name:'Oscorp Industries',domain:'oscorp.com',address:'200 Park Avenue, New York, NY 10166',industry:'Chemical & Biotech',employees:2100,owner:'James Chen',opps:3,oppValue:275000,lastActivity:'Feb 2026'},
+      signals:['domain','address','name']},
+    {id:20,confidence:80,classification:'TENANT',status:'pending',recommendation:'review',master:null,
+      a:{name:'Umbrella Corporation',domain:'umbrella.com',address:'1 Raccoon City Blvd, Raccoon City',industry:'Pharmaceutical',employees:9200,owner:'Sarah Kim',opps:3,oppValue:560000,lastActivity:'Feb 2026'},
+      b:{name:'Umbrella Biotech',domain:'umbrella-bio.com',address:'400 Dexter Ave N, Seattle, WA',industry:'Biotechnology',employees:640,owner:'Lisa Huang',opps:1,oppValue:125000,lastActivity:'Jan 2026'},
+      signals:['name_partial']},
+  ];
+
+  const pairs = [...seeds];
+  const classWeights = ['EXACT','EXACT','EXACT','EXACT','EXACT','EXACT','EXACT',
+    'REGIONAL','REGIONAL','REGIONAL','TENANT','TENANT','LOCATION','LOCATION'];
+  const intlTlds = ['.eu','.co.uk','.de','.jp','.com.au','.ca','.fr','.nl','.sg','.in'];
+
+  for(let i = 0; i < 322; i++){
+    const baseName = pick(names);
+    const suffix = pick(suffixes);
+    const classification = pick(classWeights);
+    const industry = pick(industries);
+    const owner1 = pick(owners);
+    let owner2 = pick(owners);
+    if(owner2===owner1) owner2 = owners[(owners.indexOf(owner1)+1+Math.floor(rand()*18))%owners.length];
+    const city1 = pick(cities);
+    const city2 = pick(cities);
+    const baseDomain = baseName.toLowerCase() + pick(tlds);
+    const stNum = randInt(100,9900);
+    const st = pick(streets);
+    let nameA,nameB,domainA,domainB,confidence,recommendation,master,signals;
+
+    switch(classification){
+      case 'EXACT': {
+        const variants = [
+          [baseName+' '+suffix+' Inc.', baseName+' '+suffix],
+          [baseName+' '+suffix, baseName+' '+suffix+' LLC'],
+          [baseName+' '+suffix+' Corp', baseName+' '+suffix],
+          [baseName+' '+suffix, baseName],
+          [baseName+' '+suffix+' Corporation', baseName+' '+suffix+' Corp'],
+        ];
+        const v = pick(variants);
+        nameA=v[0]; nameB=v[1];
+        domainA=baseDomain; domainB=baseDomain;
+        confidence = rand()>0.3 ? randInt(75,99) : randInt(30,74);
+        recommendation=confidence>=75?'merge':'review'; master=confidence>=75?(rand()>0.5?'A':'B'):null;
+        signals=['domain','name'];
+        if(rand()>0.3) signals.push('address');
+        if(rand()>0.6) signals.push('industry');
+        break;
+      }
+      case 'REGIONAL': {
+        const region = pick(regions);
+        nameA = baseName+' '+suffix;
+        nameB = baseName+' '+suffix+' '+region;
+        domainA = baseDomain;
+        domainB = baseName.toLowerCase()+pick(intlTlds);
+        confidence = rand()>0.4 ? randInt(25,74) : randInt(1,24);
+        recommendation = confidence>=75?'merge':'review';
+        master=null;
+        signals=['name'];
+        if(rand()>0.6) signals.push('industry');
+        break;
+      }
+      case 'TENANT': {
+        const div = pick(divisions);
+        nameA = baseName+' '+suffix;
+        nameB = baseName+' '+div;
+        domainA = baseDomain;
+        domainB = baseName.toLowerCase()+'-'+div.toLowerCase().split(' ')[0]+'.com';
+        confidence = rand()>0.5 ? randInt(25,68) : randInt(1,24);
+        recommendation='review'; master=null;
+        signals=['name_partial'];
+        if(rand()>0.5) signals.push('address_partial');
+        break;
+      }
+      case 'LOCATION': {
+        const loc = pick(locSuffixes);
+        nameA = baseName+' '+suffix;
+        nameB = baseName+' '+suffix+' '+loc;
+        domainA = baseDomain; domainB = baseDomain;
+        confidence = rand()>0.5 ? randInt(25,65) : randInt(1,24);
+        recommendation='review'; master=null;
+        signals=['domain','name'];
+        if(rand()>0.5) signals.push('industry');
+        break;
+      }
+    }
+
+    const emp1 = randInt(25,12000);
+    const emp2 = classification==='EXACT' ? Math.floor(emp1*(0.88+rand()*0.24)) : randInt(25,8000);
+    const opps1 = randInt(0,5);
+    const opps2 = randInt(0,4);
+    const val1 = opps1 * randInt(15000,220000);
+    const val2 = opps2 * randInt(15000,180000);
+    const statusRoll = rand();
+    const status = statusRoll<0.09?'resolved':statusRoll<0.14?'dismissed':'pending';
+
+    pairs.push({
+      id: 21+i, confidence, classification, status, recommendation, master,
+      a:{name:nameA,domain:domainA,address:`${stNum} ${st}, ${city1.full}`,industry,employees:emp1,owner:owner1,opps:opps1,oppValue:val1,lastActivity:pick(months)},
+      b:{name:nameB,domain:domainB,
+        address:classification==='EXACT'?`${stNum} ${pick(streets)}, ${city1.short}`:`${randInt(100,9900)} ${pick(streets)}, ${city2.full}`,
+        industry:classification==='EXACT'?(rand()>0.3?industry:pick(industries)):pick(industries),
+        employees:emp2,owner:classification==='EXACT'&&rand()>0.6?owner1:owner2,
+        opps:opps2,oppValue:val2,lastActivity:pick(months)},
+      signals,
+    });
+  }
+  return pairs;
+}
+
+const ALL_PAIRS = generateAllPairs();
+
+const FIELDS = [
+  {key:'name',label:'Account Name'},
+  {key:'domain',label:'Domain'},
+  {key:'address',label:'Address'},
+  {key:'industry',label:'Industry'},
+  {key:'employees',label:'Employees',format:v=>v?.toLocaleString()},
+  {key:'owner',label:'Account Owner'},
+  {key:'opps',label:'Open Opps',format:(v,r)=>v>0?`${v} (${fmt$(r.oppValue)})`:'None'},
+  {key:'lastActivity',label:'Last Activity'},
+];
+
+function classColor(c){return c.toLowerCase()}
+function riskScore(c){return 100-c}
+function riskTier(c){const r=100-c;if(r<=25)return'very-low';if(r<=60)return'low';if(r<=84)return'medium';return'high'}
+function riskLabel(c){const t=riskTier(c);if(t==='very-low')return'Very Low';if(t==='low')return'Low';if(t==='medium')return'Medium';return'High'}
+function fmt$(n){return n>=1000000?`$${(n/1000000).toFixed(1)}M`:`$${(n/1000).toFixed(0)}K`}
+
+const RISK_TIERS = [
+  {value:'ALL',label:'All risk levels'},
+  {value:'very-low',label:'Very Low Risk'},
+  {value:'low',label:'Low Risk'},
+  {value:'medium',label:'Medium Risk'},
+  {value:'high',label:'High Risk'},
+];
+
+function RiskDropdown({value,onChange,pairs}){
+  const [open,setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(function(){
+    function close(e){if(ref.current && !ref.current.contains(e.target)) setOpen(false)}
+    document.addEventListener('mousedown',close);
+    return function(){document.removeEventListener('mousedown',close)};
+  },[]);
+  const tiers = [
+    {value:'ALL',label:'All risk levels',dot:null},
+    {value:'very-low',label:'Very Low Risk',dot:'very-low'},
+    {value:'low',label:'Low Risk',dot:'low'},
+    {value:'medium',label:'Medium Risk',dot:'medium'},
+    {value:'high',label:'High Risk',dot:'high'},
+  ];
+  const current = tiers.find(function(t){return t.value===value}) || tiers[0];
+  return React.createElement('div',{className:'risk-dropdown',ref:ref},
+    React.createElement('button',{className:'risk-dropdown-btn',onClick:function(){setOpen(!open)}},
+      current.dot && React.createElement('span',{className:'risk-dropdown-dot '+current.dot}),
+      current.label
+    ),
+    React.createElement('div',{className:'risk-dropdown-menu'+(open?' open':'')},
+      tiers.map(function(t){
+        var count = t.value==='ALL' ? pairs.length : pairs.filter(function(p){return riskTier(p.confidence)===t.value}).length;
+        return React.createElement('div',{
+          key:t.value,
+          className:'risk-dropdown-item'+(t.value===value?' active':''),
+          onClick:function(){onChange(t.value);setOpen(false)}
+        },
+          t.dot ? React.createElement('span',{className:'risk-dropdown-dot '+t.dot}) : React.createElement('span',{style:{width:8}}),
+          t.label,
+          React.createElement('span',{style:{marginLeft:'auto',fontFamily:'var(--font-mono)',fontSize:10,color:'var(--stone-400)'}},count)
+        );
+      })
+    )
+  );
+}
+
+function App(){
+  const [pairs,setPairs] = useState(ALL_PAIRS);
+  const [filter,setFilter] = useState({classification:'ALL',search:'',riskTier:'ALL'});
+  const [sort,setSort] = useState('risk-asc');
+  const [selectedId,setSelectedId] = useState(null);
+  const [checked,setChecked] = useState(new Set());
+  const [toast,setToast] = useState(null);
+  const [page,setPage] = useState(0);
+  const [pageSize,setPageSize] = useState(50);
+  const listRef = useRef(null);
+
+  const filtered = useMemo(()=>{
+    let result = pairs.filter(p=>p.status!=='dismissed');
+    if(filter.classification!=='ALL') result = result.filter(p=>p.classification===filter.classification);
+    if(filter.riskTier!=='ALL') result = result.filter(p=>riskTier(p.confidence)===filter.riskTier);
+    if(filter.search){
+      const q = filter.search.toLowerCase();
+      result = result.filter(p=>
+        p.a.name.toLowerCase().includes(q)||p.b.name.toLowerCase().includes(q)||
+        p.a.domain.toLowerCase().includes(q)||p.b.domain.toLowerCase().includes(q)
+      );
+    }
+    result.sort((a,b)=>{
+      if(sort==='risk-asc') return b.confidence-a.confidence;
+      if(sort==='risk-desc') return a.confidence-b.confidence;
+      if(sort==='revenue-desc') return (b.a.oppValue+b.b.oppValue)-(a.a.oppValue+a.b.oppValue);
+      if(sort==='name-asc') return a.a.name.localeCompare(b.a.name);
+      return 0;
+    });
+    return result;
+  },[pairs,filter,sort]);
+
+  const paginated = useMemo(()=>filtered.slice(page*pageSize,(page+1)*pageSize),[filtered,page,pageSize]);
+  useEffect(()=>setPage(0),[filter,sort]);
+
+  // Auto-select first item
+  useEffect(()=>{
+    if(!selectedId && paginated.length>0) setSelectedId(paginated[0].id);
+  },[paginated]);
+
+  const selectedPair = pairs.find(p=>p.id===selectedId);
+  const selectedIndexInFiltered = filtered.findIndex(p=>p.id===selectedId);
+
+  function showToast(msg){setToast(msg);setTimeout(()=>setToast(null),2500)}
+
+  function handleResolve(id){
+    setPairs(prev=>prev.map(p=>p.id===id?{...p,status:'resolved'}:p));
+    showToast('Records merged successfully');
+    const idx = filtered.findIndex(p=>p.id===id);
+    const next = filtered[idx+1];
+    if(next) setSelectedId(next.id);
+  }
+
+  function handleDismiss(id){
+    setPairs(prev=>prev.map(p=>p.id===id?{...p,status:'dismissed'}:p));
+    showToast('Pair dismissed');
+    const idx = filtered.findIndex(p=>p.id===id);
+    const next = filtered[idx+1]||filtered[idx-1];
+    if(next) setSelectedId(next.id);
+  }
+
+  function handleNav(dir){
+    if(selectedIndexInFiltered<0) return;
+    const nextIdx = selectedIndexInFiltered+dir;
+    if(nextIdx>=0 && nextIdx<filtered.length){
+      setSelectedId(filtered[nextIdx].id);
+      const np = Math.floor(nextIdx/pageSize);
+      if(np!==page) setPage(np);
+    }
+  }
+
+  function toggleCheck(id){
+    setChecked(prev=>{const next=new Set(prev);if(next.has(id))next.delete(id);else next.add(id);return next});
+  }
+
+  function toggleCheckAll(){
+    const pageIds = paginated.filter(p=>p.status==='pending').map(p=>p.id);
+    const allChecked = pageIds.length>0 && pageIds.every(id=>checked.has(id));
+    if(allChecked){
+      setChecked(prev=>{const next=new Set(prev);pageIds.forEach(id=>next.delete(id));return next});
+    } else {
+      setChecked(prev=>{const next=new Set(prev);pageIds.forEach(id=>next.add(id));return next});
+    }
+  }
+
+  function handleBulkMerge(){
+    setPairs(prev=>prev.map(p=>checked.has(p.id)?{...p,status:'resolved'}:p));
+    showToast(`${checked.size} pairs merged`);
+    setChecked(new Set());
+  }
+
+  function handleBulkDismiss(){
+    setPairs(prev=>prev.map(p=>checked.has(p.id)?{...p,status:'dismissed'}:p));
+    showToast(`${checked.size} pairs dismissed`);
+    setChecked(new Set());
+  }
+
+  // Keyboard nav
+  useEffect(()=>{
+    const handler = e=>{
+      if(e.key==='ArrowDown'||e.key==='j'){e.preventDefault();handleNav(1)}
+      if(e.key==='ArrowUp'||e.key==='k'){e.preventDefault();handleNav(-1)}
+    };
+    window.addEventListener('keydown',handler);
+    return ()=>window.removeEventListener('keydown',handler);
+  },[selectedIndexInFiltered,filtered]);
+
+  const resolved = pairs.filter(p=>p.status==='resolved').length;
+  const total = pairs.filter(p=>p.status!=='dismissed').length;
+  const classFilters = ['ALL','EXACT','REGIONAL','TENANT','LOCATION'];
+  const active = pairs.filter(p=>p.status!=='dismissed');
+  const counts = {ALL:active.length};
+  classFilters.slice(1).forEach(c=>{counts[c]=active.filter(p=>p.classification===c).length});
+
+  const totalPages = Math.ceil(filtered.length/pageSize);
+  const start = page*pageSize+1;
+  const end = Math.min((page+1)*pageSize,filtered.length);
+
+  const recText = selectedPair ? (selectedPair.recommendation === 'merge'
+    ? `Merge Record ${selectedPair.master} as primary`
+    : `${riskLabel(selectedPair.confidence)} risk — review fields before merging`) : '';
+
+  const reasoning = selectedPair ? selectedPair.signals.map(s=>{
+    if(s==='domain') return 'Domain match';
+    if(s==='address') return 'Address match';
+    if(s==='name') return 'Name similarity';
+    if(s==='industry') return 'Industry match';
+    if(s==='owner') return 'Same owner';
+    if(s==='name_partial') return 'Partial name';
+    if(s==='address_partial') return 'Partial address';
+    return s;
+  }).join(' · ') : '';
+
+  const icon = (d,active)=>React.createElement('div',{className:`sidebar-icon${active?' active':''}`},
+    React.createElement('svg',{width:18,height:18,viewBox:'0 0 24 24',fill:'none',stroke:'currentColor',strokeWidth:1.5,strokeLinecap:'round',strokeLinejoin:'round'},
+      React.createElement('path',{d})
+    )
+  );
+
+  return React.createElement('div',{className:'app'},
+    // SIDEBAR
+    React.createElement('div',{className:'sidebar'},
+      React.createElement('img',{src:'images/Logo.svg',style:{width:26,height:26,marginBottom:12}}),
+      icon('M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1h-2z'),
+      icon('M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4'),
+      icon('M8 7h2M8 11h2m4-4h2m-2 4h2M7 3h10a2 2 0 012 2v14a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z',true),
+      icon('M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z'),
+      icon('M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2zM15 12a3 3 0 11-6 0 3 3 0 016 0z'),
+      React.createElement('div',{className:'sidebar-spacer'}),
+    ),
+    // MAIN
+    React.createElement('div',{className:'app-main'},
+    // NAV
+    // TOP BAR
+    React.createElement('div',{className:'top-bar'},
+      React.createElement('div',{className:'page-header'},
+        React.createElement('div',null,
+          React.createElement('h1',{className:'page-title'},'Duplicate Resolution'),
+          React.createElement('div',{className:'page-subtitle'},
+            `${pairs.length} pairs flagged · 15,247 accounts scanned`,
+            React.createElement('span',{className:'source-badge'},
+              React.createElement('svg',{width:14,height:10,viewBox:'0 0 50 36',fill:'none'},
+                React.createElement('path',{d:'M39.5 12.4C38.1 5.3 31.8 0 24.3 0 18.4 0 13.3 3.3 10.8 8.1 4.7 8.7 0 13.8 0 20c0 6.6 5.4 12 12 12h27c5.5 0 10-4.5 10-10 0-5.2-4-9.5-9.2-9.9l-.3.3z',fill:'#00A1E0'})
+              ),
+              'Salesforce'
+            )
+          ),
+        ),
+        React.createElement('div',{style:{display:'flex',alignItems:'center',gap:12}},
+          React.createElement('svg',{width:18,height:18,viewBox:'0 0 24 24',fill:'none',stroke:'var(--stone-400)',strokeWidth:1.5,strokeLinecap:'round',strokeLinejoin:'round',style:{cursor:'pointer'}},
+            React.createElement('path',{d:'M12.22 2h-.44a2 2 0 00-2 2v.18a2 2 0 01-1 1.73l-.43.25a2 2 0 01-2 0l-.15-.08a2 2 0 00-2.73.73l-.22.38a2 2 0 00.73 2.73l.15.1a2 2 0 011 1.72v.51a2 2 0 01-1 1.74l-.15.09a2 2 0 00-.73 2.73l.22.38a2 2 0 002.73.73l.15-.08a2 2 0 012 0l.43.25a2 2 0 011 1.73V20a2 2 0 002 2h.44a2 2 0 002-2v-.18a2 2 0 011-1.73l.43-.25a2 2 0 012 0l.15.08a2 2 0 002.73-.73l.22-.39a2 2 0 00-.73-2.73l-.15-.08a2 2 0 01-1-1.74v-.5a2 2 0 011-1.74l.15-.09a2 2 0 00.73-2.73l-.22-.38a2 2 0 00-2.73-.73l-.15.08a2 2 0 01-2 0l-.43-.25a2 2 0 01-1-1.73V4a2 2 0 00-2-2z'}),
+            React.createElement('circle',{cx:12,cy:12,r:3})
+          ),
+          React.createElement('div',{style:{width:30,height:30,borderRadius:'50%',background:'var(--stone-200)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--stone-600)',fontSize:11,fontWeight:600,cursor:'pointer'}},'AO'),
+        ),
+      ),
+      React.createElement('div',{className:'toolbar'},
+        React.createElement('div',{className:'checkbox'+(paginated.filter(p=>p.status==='pending').length>0&&paginated.filter(p=>p.status==='pending').every(p=>checked.has(p.id))?' checked':paginated.some(p=>checked.has(p.id))?' partial':''),onClick:toggleCheckAll,style:{cursor:'pointer'}}),
+        React.createElement('div',{className:`bulk-actions${checked.size>0?' visible':''}`},
+          React.createElement('span',{className:'bulk-count'},`${checked.size} selected`),
+          React.createElement('button',{className:'bulk-btn',onClick:handleBulkMerge},'Merge'),
+          React.createElement('button',{className:'bulk-btn secondary',onClick:handleBulkDismiss},'Dismiss'),
+        ),
+        React.createElement('input',{className:'search-input',placeholder:'Search accounts...',value:filter.search,onChange:e=>setFilter({...filter,search:e.target.value})}),
+        React.createElement('div',{className:'filter-pills'},
+          classFilters.map(c=>
+            React.createElement('button',{key:c,className:`pill ${filter.classification===c?'active':''}`,onClick:()=>setFilter({...filter,classification:c})},
+              c==='ALL'?'All':c.charAt(0)+c.slice(1).toLowerCase(),
+              React.createElement('span',{className:'count'},counts[c])
+            )
+          )
+        ),
+        React.createElement(RiskDropdown,{value:filter.riskTier,onChange:function(v){setFilter({...filter,riskTier:v})},pairs:active}),
+        React.createElement('select',{className:'sort-select',value:sort,onChange:e=>setSort(e.target.value)},
+          React.createElement('option',{value:'risk-asc'},'Risk: Low \u2192 High'),
+          React.createElement('option',{value:'risk-desc'},'Risk: High \u2192 Low'),
+          React.createElement('option',{value:'revenue-desc'},'Revenue: High \u2192 Low'),
+          React.createElement('option',{value:'name-asc'},'Name: A \u2192 Z'),
+        ),
+        filter.riskTier!=='ALL' && React.createElement('button',{
+          className:'bulk-btn',
+          style:{},
+          onClick:function(){
+            var tierPairs = filtered.filter(function(p){return p.status==='pending'});
+            setPairs(function(prev){return prev.map(function(p){
+              return tierPairs.some(function(tp){return tp.id===p.id}) ? Object.assign({},p,{status:'resolved'}) : p;
+            })});
+            showToast('Merged '+tierPairs.length+' '+riskLabel(tierPairs[0]?.confidence)+' risk pairs');
+          }
+        },'Merge all '+filtered.filter(function(p){return p.status==='pending'}).length+' pairs'),
+        React.createElement('div',{style:{marginLeft:'auto',display:'flex',alignItems:'center',gap:8}},
+          React.createElement('div',{className:'progress-bar-track',style:{width:120}},
+            React.createElement('div',{className:'progress-bar-fill',style:{width:(resolved/total)*100+'%'}})
+          ),
+          React.createElement('span',{style:{fontFamily:'var(--font-mono)',fontSize:10,color:'var(--stone-400)',whiteSpace:'nowrap'}},resolved+'/'+total+' resolved'),
+        ),
+      ),
+    ),
+    // SPLIT PANE
+    React.createElement('div',{className:'split'},
+      // LEFT: LIST
+      React.createElement('div',{className:'list-pane'},
+        React.createElement('div',{className:'list-scroll',ref:listRef},
+          paginated.length===0
+            ? React.createElement('div',{style:{padding:40,textAlign:'center',color:'var(--stone-400)'}},'No pairs match your filters')
+            : paginated.map(pair=>{
+                const isSelected = pair.id===selectedId;
+                const isChecked = checked.has(pair.id);
+                return React.createElement('div',{
+                  key:pair.id,
+                  className:`list-item ${isSelected?'selected':''} ${pair.status==='resolved'?'resolved':''}`,
+                  onClick:()=>setSelectedId(pair.id),
+                },
+                  React.createElement('div',{className:'list-item-check',onClick:e=>{e.stopPropagation();toggleCheck(pair.id)}},
+                    React.createElement('div',{className:`checkbox ${isChecked?'checked':''}`})
+                  ),
+                  React.createElement('div',{className:'list-item-body'},
+                    React.createElement('div',{className:'list-item-info'},
+                      React.createElement('div',{className:'list-item-top'},
+                        React.createElement('span',{className:'list-item-name'},pair.a.name),
+                        React.createElement('div',{className:'list-item-dup-row'},
+                          React.createElement('svg',{width:14,height:14,viewBox:'0 0 16 16',fill:'none'},
+                            React.createElement('g',{opacity:0.4},
+                              React.createElement('path',{d:'M9.333 6L6 2.667 2.667 6',stroke:'black',strokeWidth:1.333,strokeLinecap:'round',strokeLinejoin:'round'}),
+                              React.createElement('path',{d:'M13.333 13.333H8.667c-.708 0-1.386-.28-1.886-.78A2.667 2.667 0 016 10.666V2.667',stroke:'black',strokeWidth:1.333,strokeLinecap:'round',strokeLinejoin:'round'})
+                            )
+                          ),
+                          React.createElement('span',{className:'list-item-dup'},pair.b.name),
+                        ),
+                      ),
+                      React.createElement('div',{className:'list-item-meta'},
+                        pair.a.owner===pair.b.owner
+                          ? `${pair.a.owner} · ${pair.a.domain} · ${pair.a.lastActivity}`
+                          : `${pair.a.owner} · ${pair.b.owner} · ${pair.a.domain} · ${pair.a.lastActivity}`
+                      ),
+                    ),
+                    React.createElement('div',{className:'list-item-chips'},
+                      pair.status==='resolved'
+                        ? React.createElement('span',{className:'resolved-badge'},'Merged')
+                        : React.createElement(React.Fragment,null,
+                            React.createElement('span',{className:`risk-chip ${riskTier(pair.confidence)}`},
+                              riskLabel(pair.confidence),
+                              React.createElement('span',{className:'risk-pct'},`${riskScore(pair.confidence)}%`)
+                            ),
+                            React.createElement('span',{className:`badge ${classColor(pair.classification)}`},pair.classification),
+                          ),
+                    ),
+                  ),
+                );
+              })
+        ),
+        totalPages>1 && React.createElement('div',{className:'list-footer'},
+          React.createElement('span',null,`${start}\u2013${end} of ${filtered.length}`),
+          React.createElement('div',{className:'page-controls'},
+            React.createElement('button',{className:'page-btn nav-btn',disabled:page===0,onClick:()=>setPage(page-1)},'\u2039'),
+            Array.from({length:Math.min(totalPages,5)},function(_,i){
+              var p;
+              if(totalPages<=5) p=i;
+              else if(page<3) p=i;
+              else if(page>totalPages-4) p=totalPages-5+i;
+              else p=page-2+i;
+              return React.createElement('button',{key:p,className:'page-btn'+(p===page?' active':''),onClick:function(){setPage(p)}},p+1);
+            }),
+            React.createElement('button',{className:'page-btn nav-btn',disabled:page>=totalPages-1,onClick:()=>setPage(page+1)},'\u203A'),
+          ),
+          React.createElement('select',{value:pageSize,onChange:e=>{setPageSize(Number(e.target.value));setPage(0)},style:{height:24,padding:'0 18px 0 6px',border:'1px solid var(--stone-200)',borderRadius:4,fontSize:10,fontWeight:500,color:'var(--stone-600)',background:'white',appearance:'none',cursor:'pointer'}},
+            React.createElement('option',{value:25},'25'),
+            React.createElement('option',{value:50},'50'),
+            React.createElement('option',{value:100},'100'),
+          ),
+        ),
+      ),
+      // RIGHT: DETAIL
+      React.createElement('div',{className:'detail-pane'},
+        !selectedPair
+          ? React.createElement('div',{className:'detail-empty'},'Select a pair to review')
+          : React.createElement(React.Fragment,null,
+              React.createElement('div',{className:'detail-header'},
+                React.createElement('div',{className:'detail-title'},`${selectedPair.a.name} \u2194 ${selectedPair.b.name}`),
+                React.createElement('div',{className:'detail-meta'},
+                  React.createElement('span',{className:`risk-chip ${riskTier(selectedPair.confidence)}`},
+                    riskLabel(selectedPair.confidence)+' Risk',
+                    React.createElement('span',{className:'risk-pct'},`${riskScore(selectedPair.confidence)}%`)
+                  ),
+                  React.createElement('span',{className:`badge ${classColor(selectedPair.classification)}`},selectedPair.classification),
+                  React.createElement('span',{style:{fontSize:12,color:'var(--stone-400)'}},`${selectedIndexInFiltered+1} of ${filtered.length}`),
+                ),
+              ),
+              React.createElement('div',{className:'detail-body'},
+                // AI suggestion
+                React.createElement('div',{className:`ai-card ${riskTier(selectedPair.confidence)}`},
+                  React.createElement('div',{className:'ai-label'},'Kernel Suggestion'),
+                  React.createElement('div',{className:'ai-rec'},
+                    React.createElement('svg',{width:14,height:14,viewBox:'0 0 14 14',fill:'none',style:{display:'inline',verticalAlign:'-2px',marginRight:6}},
+                      React.createElement('path',{d:'M8.659 6.927v3.464M6.927 8.659h3.464M2.309 9.237c-.635 0-1.154-.52-1.154-1.155V2.309c0-.635.52-1.154 1.154-1.154h5.773c.635 0 1.155.52 1.155 1.154M5.773 4.618h5.773c.637 0 1.154.517 1.154 1.155v5.773c0 .637-.517 1.154-1.154 1.154H5.773c-.638 0-1.155-.517-1.155-1.154V5.773c0-.638.517-1.155 1.155-1.155z',stroke:'currentColor',strokeLinecap:'round',strokeLinejoin:'round'})
+                    ),
+                    recText
+                  ),
+                  React.createElement('div',{className:'ai-reasoning'},reasoning),
+                ),
+                // Record cards side by side
+                React.createElement('div',{className:'record-cards-wrap'},
+                React.createElement('div',{className:'record-cards'},
+                  // Card A
+                  React.createElement('div',{className:`record-card ${selectedPair.master==='A'?'primary':''}`},
+                    React.createElement('div',{className:'record-card-header'},
+                      React.createElement('span',{className:'record-card-name'},selectedPair.a.name),
+                      selectedPair.master==='A' && React.createElement('span',{className:'primary-badge'},'Primary'),
+                    ),
+                    React.createElement('div',{className:'record-card-fields'},
+                      FIELDS.map(f=>{
+                        const val = f.format ? f.format(selectedPair.a[f.key],selectedPair.a) : selectedPair.a[f.key];
+                        return React.createElement('div',{key:f.key,className:'record-field'},
+                          React.createElement('span',{className:'record-field-label'},f.label),
+                          React.createElement('span',{className:'record-field-value'},String(val??'\u2014')),
+                        );
+                      })
+                    ),
+                  ),
+                  // Divider with connector pill
+                  React.createElement('div',{className:'record-cards-divider'},
+                    React.createElement('div',{className:'record-cards-connector'})
+                  ),
+                  // Card B
+                  React.createElement('div',{className:`record-card ${selectedPair.master==='B'?'primary':''}`},
+                    React.createElement('div',{className:'record-card-header'},
+                      React.createElement('span',{className:'record-card-name'},selectedPair.b.name),
+                      selectedPair.master==='B' && React.createElement('span',{className:'primary-badge'},'Primary'),
+                    ),
+                    React.createElement('div',{className:'record-card-fields'},
+                      FIELDS.map(f=>{
+                        const val = f.format ? f.format(selectedPair.b[f.key],selectedPair.b) : selectedPair.b[f.key];
+                        return React.createElement('div',{key:f.key,className:'record-field'},
+                          React.createElement('span',{className:'record-field-label'},f.label),
+                          React.createElement('span',{className:'record-field-value'},String(val??'\u2014')),
+                        );
+                      })
+                    ),
+                  ),
+                ), // close record-cards
+                ), // close record-cards-wrap
+                // Actions
+                React.createElement('div',{className:'detail-actions'},
+                  React.createElement('div',{className:'detail-actions-left'},
+                    React.createElement('button',{className:'btn btn-primary',onClick:()=>handleResolve(selectedPair.id)},'Merge Records'),
+                    React.createElement('button',{className:'btn btn-secondary',onClick:()=>handleNav(1)},'Skip'),
+                  ),
+                  React.createElement('button',{className:'btn btn-ghost btn-danger',onClick:()=>handleDismiss(selectedPair.id)},'Not a Duplicate'),
+                ),
+              ),
+            ),
+      ),
+    ),
+    // TOAST
+    React.createElement('div',{className:`toast ${toast?'show':''}`},
+      toast && React.createElement(React.Fragment,null,
+        React.createElement('span',{className:'toast-icon'},'\u2713'),toast
+      )
+    ),
+    ), // close app-main
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>
